@@ -12,12 +12,13 @@ class QuickOrderItem extends Model
     protected $fillable = [
         'quick_order_id',
         'product_id',
+        'price',
         'quantity',
     ];
 
     public function order()
     {
-        return $this->belongsTo(QuickOrder::class);
+        return $this->belongsTo(QuickOrder::class, 'quick_order_id');
     }
 
     public function product()

@@ -3,15 +3,13 @@
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Tenant;
+use App\Models\QuickOrder;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
-use Livewire\WithPagination;
 
 new class extends Component
 {
-    use WithPagination;
-
     public int $perPage = 10;
 
     #[Computed]
@@ -32,22 +30,46 @@ new class extends Component
             ->where('data_tenant->tenant_code', $tenant->tenant_code);
     }
 
+    private function quickOrdersQuery()
+    {
+        $tenant = $this->tenant;
+        if (! $tenant) {
+            return QuickOrder::query()->whereRaw('1 = 0');
+        }
+
+        return QuickOrder::query()->where('tenant_id', $tenant->id);
+    }
+
     #[Computed]
-    public function totalOrders(): int
+    public function totalPreOrders(): int
     {
         return $this->ordersQuery()->count();
     }
 
     #[Computed]
+    public function totalQuickOrders(): int
+    {
+        return $this->quickOrdersQuery()->count();
+    }
+
+    #[Computed]
+    public function totalOrders(): int
+    {
+        return $this->totalPreOrders + $this->totalQuickOrders;
+    }
+
+    #[Computed]
     public function processingOrders(): int
     {
+        // Quick order selalu langsung selesai, jadi hanya pre-order yang bisa berstatus proses
         return $this->ordersQuery()->whereIn('status', ['Pending', 'Diproses'])->count();
     }
 
     #[Computed]
     public function completedOrders(): int
     {
-        return $this->ordersQuery()->where('status', 'Selesai')->count();
+        // Semua quick order dihitung selesai
+        return $this->ordersQuery()->where('status', 'Selesai')->count() + $this->totalQuickOrders;
     }
 
     #[Computed]
@@ -57,11 +79,23 @@ new class extends Component
     }
 
     #[Computed]
-    public function totalRevenue(): float
+    public function preOrderRevenue(): float
     {
         return (float) $this->ordersQuery()
             ->where('status', 'Selesai')
             ->sum('total_amount');
+    }
+
+    #[Computed]
+    public function quickOrderRevenue(): float
+    {
+        return (float) $this->quickOrdersQuery()->sum('total_amount');
+    }
+
+    #[Computed]
+    public function totalRevenue(): float
+    {
+        return $this->preOrderRevenue + $this->quickOrderRevenue;
     }
 
     #[Computed]
@@ -80,10 +114,38 @@ new class extends Component
     #[Computed]
     public function recentOrders()
     {
-        return $this->ordersQuery()
+        $orders = $this->ordersQuery()
             ->latest()
             ->limit($this->perPage)
-            ->get();
+            ->get()
+            ->map(fn ($order) => (object) [
+                'type' => 'preorder',
+                'key' => 'order-' . $order->id,
+                'order_number' => $order->order_number,
+                'created_at' => $order->created_at,
+                'status' => $order->status,
+                'payment_method' => $order->payment_status ?? $order->payment_method,
+                'total_amount' => $order->total_amount ?? 0,
+            ]);
+
+        $quickOrders = $this->quickOrdersQuery()
+            ->latest()
+            ->limit($this->perPage)
+            ->get()
+            ->map(fn ($order) => (object) [
+                'type' => 'quick',
+                'key' => 'quick-' . $order->id,
+                'order_number' => $order->order_number,
+                'created_at' => $order->created_at,
+                'status' => 'Selesai',
+                'payment_method' => 'Dibayar di Tempat',
+                'total_amount' => $order->total_amount ?? 0,
+            ]);
+
+        return $orders->concat($quickOrders)
+            ->sortByDesc('created_at')
+            ->take($this->perPage)
+            ->values();
     }
 
     public function render()
@@ -138,8 +200,33 @@ new class extends Component
             <p class="text-xl font-bold text-red-600">{{ $this->cancelledOrders }}</p>
         </div>
         <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p class="text-xs text-gray-500">Total Pendapatan (Selesai)</p>
+            <p class="text-xs text-gray-500">Total Pendapatan</p>
             <p class="text-xl font-bold text-gray-900">Rp{{ number_format($this->totalRevenue, 0, ',', '.') }}</p>
+        </div>
+    </div>
+
+    {{-- Breakdown Pre-Order vs Pesanan Langsung --}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex items-center justify-between">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">Pre Order</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">{{ $this->totalPreOrders }} pesanan</p>
+                <p class="text-lg font-bold text-gray-900">Rp{{ number_format($this->preOrderRevenue, 0, ',', '.') }}</p>
+            </div>
+            <a href="/dashboard/order" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700">Kelola →</a>
+        </div>
+
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex items-center justify-between">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center rounded bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20">Pesanan Langsung</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">{{ $this->totalQuickOrders }} pesanan</p>
+                <p class="text-lg font-bold text-gray-900">Rp{{ number_format($this->quickOrderRevenue, 0, ',', '.') }}</p>
+            </div>
+            <a href="/dashboard/report" class="text-xs font-semibold text-orange-600 hover:text-orange-700">Buat baru →</a>
         </div>
     </div>
 
@@ -199,9 +286,8 @@ new class extends Component
             <div class="px-5 py-4 border-b bg-gray-50 flex items-center justify-between gap-3">
                 <div>
                     <h3 class="text-sm font-semibold text-gray-800">Pesanan Terbaru</h3>
-                    <p class="text-xs text-gray-500 mt-1">Menampilkan {{ $this->perPage }} pesanan terakhir</p>
                 </div>
-                <a href="/dashboard/order" class="text-sm font-semibold text-orange-600 hover:text-orange-700">Lihat semua →</a>
+                <a href="/dashboard/report" class="text-sm font-semibold text-orange-600 hover:text-orange-700">Lihat semua →</a>
             </div>
 
             <div class="overflow-x-auto">
@@ -209,6 +295,7 @@ new class extends Component
                     <thead class="bg-white">
                         <tr>
                             <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">No.</th>
+                            <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jenis</th>
                             <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
                             <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th class="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bayar</th>
@@ -217,16 +304,23 @@ new class extends Component
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @forelse($this->recentOrders as $order)
-                            <tr class="hover:bg-orange-50/40">
+                            <tr wire:key="dash-recent-{{ $order->key }}" class="hover:bg-orange-50/40">
                                 <td class="px-5 py-3 text-sm font-medium text-gray-800">{{ $order->order_number }}</td>
+                                <td class="px-5 py-3 text-sm">
+                                    @if ($order->type === 'preorder')
+                                        <span class="inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">Pre Order</span>
+                                    @else
+                                        <span class="inline-flex items-center rounded bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20">Langsung</span>
+                                    @endif
+                                </td>
                                 <td class="px-5 py-3 text-sm text-gray-600">{{ $order->created_at?->format('d/m/Y H:i') }}</td>
                                 <td class="px-5 py-3 text-sm text-gray-700">{{ $order->status }}</td>
-                                <td class="px-5 py-3 text-sm text-gray-600">{{ $order->payment_status ?? $order->payment_method }}</td>
-                                <td class="px-5 py-3 text-sm text-right font-semibold text-gray-900">Rp{{ number_format($order->total_amount ?? 0, 0, ',', '.') }}</td>
+                                <td class="px-5 py-3 text-sm text-gray-600">{{ $order->payment_method }}</td>
+                                <td class="px-5 py-3 text-sm text-right font-semibold text-gray-900">Rp{{ number_format($order->total_amount, 0, ',', '.') }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-5 py-10 text-center text-sm text-gray-400">
+                                <td colspan="6" class="px-5 py-10 text-center text-sm text-gray-400">
                                     Belum ada pesanan.
                                 </td>
                             </tr>
@@ -237,4 +331,3 @@ new class extends Component
         </div>
     </div>
 </div>
-

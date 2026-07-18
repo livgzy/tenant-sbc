@@ -46,7 +46,7 @@ new class extends Component
         ]);;
 
         Auth::guard('tenant')->login($user);
-        return redirect('/dashboard');
+        return redirect('/reservasi');
     }
 
     public function render()
@@ -125,6 +125,7 @@ new class extends Component
                                     <option value="Manajemen">Manajemen</option>
                                     <option value="Manajemen Bisnis">Manajemen Bisnis</option>
                                     <option value="Akuntansi">Akuntansi</option>
+                                    <option value="Bisnis Digital">Bisnis Digital</option>
                                 </select>
                                 
                             </div>

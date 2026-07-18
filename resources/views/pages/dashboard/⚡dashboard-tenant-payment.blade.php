@@ -112,6 +112,13 @@ new class extends Component
             $this->addError('account_number', 'Nomor rekening/akun wajib diisi untuk ' . ($this->type === 'bank_transfer' ? 'Bank Transfer' : 'E-Wallet') . '.');
             return;
         }
+
+        $reservation = Auth::guard('tenant')->user()->reservation()->latest()->first();
+        $tenant = $reservation ? $reservation->tenant : null;
+        if ($tenant->is_open) {
+            $this->dispatch('error', message: 'Tenant harus ditutup terlebih dahulu', type: 'error');
+            return;
+        }
         
         $qrPath = $this->existing_qr;
         
@@ -123,13 +130,7 @@ new class extends Component
         }
         
         if ($this->isEditing) {
-            $reservation = Auth::guard('tenant')->user()->reservation()->latest()->first();
-            $tenant = $reservation ? $reservation->tenant : null;
 
-            if ($tenant->is_open) {
-                $this->dispatch('error', message: 'Tenant harus ditutup terlebih dahulu', type: 'error');
-                return;
-            }
             $payment = PaymentMethod::findOrFail($this->paymentId);
             $payment->update([
                 'type' => $this->type,

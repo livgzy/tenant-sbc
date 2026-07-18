@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\TenantReportPrintController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,7 @@ Route::middleware(['auth:tenant', 'can:tenant-dashboard-access'])->group(functio
     Route::livewire('/dashboard/tenant/payment', 'pages::dashboard.dashboard-tenant-payment')->name('dashboard.tenant.payment');
     Route::livewire('/dashboard/order', 'pages::dashboard.dashboard-order')->name('dashboard.orders');
     Route::livewire('/dashboard/report', 'pages::dashboard.dashboard-report-order')->name('dashboard.reports');
+    Route::get('/dashboard/report/print', TenantReportPrintController::class)->name('report.print');
 });
 
 Route::middleware(['auth:tenant', 'can:reservation-access'])->group(function () {

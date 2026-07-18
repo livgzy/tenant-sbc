@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\QuickOrder;
+use App\Models\QuickOrderItem;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,6 +22,13 @@ new class extends Component
 
     public bool $showQuickOrder = false;
     public array $cart = [];
+
+    public int $historyPage = 1;
+
+    public bool $showOrderDetail = false;
+    public ?array $selectedOrder = null;
+
+    private const HISTORY_PER_PAGE = 15;
 
     public function mount()
     {
@@ -59,14 +67,31 @@ new class extends Component
             ->whereBetween('created_at', [$from, $to]);
     }
 
+    private function quickOrdersQuery()
+    {
+        [$from, $to] = $this->dateRange();
+
+        return QuickOrder::query()
+            ->where('tenant_id', $this->tenant->id)
+            ->whereBetween('created_at', [$from, $to]);
+    }
+
     #[Computed]
     public function summary(): array
     {
         $totalOrders = $this->ordersQuery()->count();
-        $validOrders = $this->ordersQuery()->where('status','Selesai')->count();
+        $validOrders = $this->ordersQuery()->where('status', 'Selesai')->count();
         $totalRevenue = (float) $this->ordersQuery()->where('status', 'Selesai')->sum('total_amount');
         $completedOrders = $this->ordersQuery()->where('status', 'Selesai')->count();
         $cancelledOrders = $this->ordersQuery()->where('status', 'Dibatalkan')->count();
+
+        $quickCount = $this->quickOrdersQuery()->count();
+        $quickRevenue = (float) $this->quickOrdersQuery()->sum('total_amount');
+
+        $totalOrders += $quickCount;
+        $validOrders += $quickCount;
+        $totalRevenue += $quickRevenue;
+        $completedOrders += $quickCount;
 
         return [
             'total_orders' => $totalOrders,
@@ -86,7 +111,12 @@ new class extends Component
             ->where('status', 'Selesai')
             ->selectRaw('DATE(created_at) as tanggal, SUM(total_amount) as total, COUNT(*) as jumlah')
             ->groupBy('tanggal')
-            ->orderBy('tanggal')
+            ->get()
+            ->keyBy('tanggal');
+
+        $quickRows = $this->quickOrdersQuery()
+            ->selectRaw('DATE(created_at) as tanggal, SUM(total_amount) as total, COUNT(*) as jumlah')
+            ->groupBy('tanggal')
             ->get()
             ->keyBy('tanggal');
 
@@ -98,8 +128,8 @@ new class extends Component
         while ($cursor->lte($to)) {
             $key = $cursor->format('Y-m-d');
             $labels[] = $cursor->format('d M');
-            $revenue[] = (float) ($rows[$key]->total ?? 0);
-            $count[] = (int) ($rows[$key]->jumlah ?? 0);
+            $revenue[] = (float) ($rows[$key]->total ?? 0) + (float) ($quickRows[$key]->total ?? 0);
+            $count[] = (int) ($rows[$key]->jumlah ?? 0) + (int) ($quickRows[$key]->jumlah ?? 0);
             $cursor->addDay();
 
             if (count($labels) >= 62) {
@@ -113,12 +143,8 @@ new class extends Component
     #[Computed]
     public function topProducts()
     {
-        // 1. Ambil semua produk milik tenant ini
-        $products = Product::query()
-            ->where('tenant_id', $this->tenant->id)
-            ->get();
+        $products = Product::query()->where('tenant_id', $this->tenant->id)->get();
 
-        // 2. Ambil semua item pesanan dari pesanan yang tidak dibatalkan, SEPANJANG WAKTU
         $items = OrderItem::query()
             ->whereHas('order', function ($q) {
                 $q->where('data_tenant->tenant_code', $this->tenant->tenant_code)
@@ -127,15 +153,26 @@ new class extends Component
             ->get()
             ->groupBy('product_id');
 
-        // 3. Petakan setiap produk dengan menyertakan status is_preorder
-        return $products->map(function ($product) use ($items) {
+        $quickItems = QuickOrderItem::query()
+            ->whereHas('order', function ($q) {
+                $q->where('tenant_id', $this->tenant->id);
+            })
+            ->get()
+            ->groupBy('product_id');
+
+        return $products->map(function ($product) use ($items, $quickItems) {
             $productItems = $items->get($product->id, collect());
+            $quickProductItems = $quickItems->get($product->id, collect());
+
+            $qty = $productItems->sum('quantity') + $quickProductItems->sum('quantity');
+            $revenue = $productItems->sum(fn ($i) => $i->quantity * (float) data_get($i->data_product, 'price', 0))
+                + $quickProductItems->sum(fn ($i) => $i->quantity * (float) $i->price);
 
             return [
                 'name' => $product->name,
-                'is_preorder' => (bool) $product->is_preorder, // Ditambahkan di sini
-                'qty' => $productItems->sum('quantity'),
-                'revenue' => $productItems->sum(fn ($i) => $i->quantity * (float) data_get($i->data_product, 'price', 0)),
+                'is_preorder' => (bool) $product->is_preorder,
+                'qty' => $qty,
+                'revenue' => $revenue,
             ];
         })
         ->sortByDesc('qty')
@@ -143,9 +180,129 @@ new class extends Component
     }
 
     #[Computed]
-    public function recentOrders()
+    public function orderHistory(): array
     {
-        return $this->ordersQuery()->latest()->limit(15)->get();
+        $orders = $this->ordersQuery()->get()->map(fn ($order) => (object) [
+            'type' => 'preorder',
+            'id' => $order->id,
+            'key' => 'order-' . $order->id,
+            'order_number' => $order->order_number,
+            'created_at' => $order->created_at,
+            'status' => $order->status,
+            'payment_method' => $order->payment_method,
+            'total_amount' => $order->total_amount,
+        ]);
+
+        $quickOrders = $this->quickOrdersQuery()->get()->map(fn ($order) => (object) [
+            'type' => 'quick',
+            'id' => $order->id,
+            'key' => 'quick-' . $order->id,
+            'order_number' => $order->order_number,
+            'created_at' => $order->created_at,
+            'status' => 'Selesai',
+            'payment_method' => 'Dibayar di Tempat',
+            'total_amount' => $order->total_amount,
+        ]);
+
+        $merged = $orders->concat($quickOrders)->sortByDesc('created_at')->values();
+
+        $total = $merged->count();
+        $lastPage = max(1, (int) ceil($total / self::HISTORY_PER_PAGE));
+        $currentPage = min(max(1, $this->historyPage), $lastPage);
+
+        $items = $merged->slice(($currentPage - 1) * self::HISTORY_PER_PAGE, self::HISTORY_PER_PAGE)->values();
+
+        return [
+            'items' => $items,
+            'current_page' => $currentPage,
+            'last_page' => $lastPage,
+            'total' => $total,
+        ];
+    }
+
+    public function setHistoryPage(int $page): void
+    {
+        $this->historyPage = max(1, $page);
+        unset($this->orderHistory);
+    }
+
+    public function viewOrderDetail(string $type, int $id): void
+    {
+        $tenant = $this->tenant;
+
+        if ($type === 'preorder') {
+            $order = Order::with('items')
+                ->where('data_tenant->tenant_code', $tenant->tenant_code)
+                ->find($id);
+
+            if (! $order) {
+                $this->dispatch('notify', type: 'error', message: 'Pesanan tidak ditemukan.');
+                return;
+            }
+
+            $this->selectedOrder = [
+                'type' => 'preorder',
+                'order_number' => $order->order_number,
+                'created_at' => $order->created_at->format('d/m/Y H:i'),
+                'status' => $order->status,
+                'payment_method' => $order->payment_method,
+                'payment_status' => $order->payment_status,
+                'total_amount' => $order->total_amount,
+                'pickup_day' => data_get($order->data_pickup_slot, 'dayPickup'),
+                'pickup_start' => data_get($order->data_pickup_slot, 'start_time'),
+                'pickup_end' => data_get($order->data_pickup_slot, 'end_time'),
+                'items' => $order->items->map(fn ($item) => [
+                    'name' => data_get($item->data_product, 'name', '-'),
+                    'price' => (float) data_get($item->data_product, 'price', 0),
+                    'quantity' => $item->quantity,
+                    'subtotal' => $item->quantity * (float) data_get($item->data_product, 'price', 0),
+                ])->toArray(),
+            ];
+        } else {
+            $order = QuickOrder::with('items.product')
+                ->where('tenant_id', $tenant->id)
+                ->find($id);
+
+            if (! $order) {
+                $this->dispatch('notify', type: 'error', message: 'Pesanan tidak ditemukan.');
+                return;
+            }
+
+            $this->selectedOrder = [
+                'type' => 'quick',
+                'order_number' => $order->order_number,
+                'created_at' => $order->created_at->format('d/m/Y H:i'),
+                'status' => 'Selesai',
+                'payment_method' => 'Dibayar di Tempat',
+                'payment_status' => 'Sudah Dibayar',
+                'total_amount' => $order->total_amount,
+                'pickup_day' => null,
+                'pickup_start' => null,
+                'pickup_end' => null,
+                'items' => $order->items->map(fn ($item) => [
+                    'name' => $item->product->name ?? '-',
+                    'price' => (float) $item->price,
+                    'quantity' => $item->quantity,
+                    'subtotal' => $item->quantity * (float) $item->price,
+                ])->toArray(),
+            ];
+        }
+
+        $this->showOrderDetail = true;
+    }
+
+    public function closeOrderDetail(): void
+    {
+        $this->showOrderDetail = false;
+        $this->selectedOrder = null;
+    }
+
+    public function printReport(): void
+    {
+        $this->dispatch('open-print-report', url: route('report.print', [
+            'from' => $this->customFrom,
+            'to' => $this->customTo,
+        ]));
     }
 
     #[Computed]
@@ -177,6 +334,7 @@ new class extends Component
                 return [
                     'product' => $product,
                     'qty' => $qty,
+                    'price' => $product->price,
                     'subtotal' => $product->price * $qty,
                 ];
             })
@@ -267,26 +425,28 @@ new class extends Component
                 $totalAmount += $products[$productId]->price * $qty;
             }
 
-            $order = QuickOrder::create([
+            $quick_order = QuickOrder::create([
                 'order_number' => $this->generateOrderNumber($tenant),
                 'tenant_id' => $tenant->id,
                 'total_amount' => $totalAmount,
             ]);
 
             foreach ($this->cart as $productId => $qty) {
-                $order->items()->create([
+                $quick_order->items()->create([
                     'product_id' => $products[$productId]->id,
+                    'price' => $products[$productId]->price,
                     'quantity' => $qty,
                 ]);
             }
 
-            return $order->order_number;
+            return $quick_order->order_number;
         });
 
         $this->cart = [];
         $this->showQuickOrder = false;
+        $this->historyPage = 1;
 
-        unset($this->summary, $this->chartData, $this->topProducts, $this->recentOrders, $this->cartItems, $this->cartTotal);
+        unset($this->summary, $this->chartData, $this->topProducts, $this->orderHistory, $this->cartItems, $this->cartTotal);
 
         $this->dispatch('notify', type: 'success', message: "Pesanan langsung {$orderNumber} berhasil dibuat.");
     }
@@ -294,10 +454,10 @@ new class extends Component
     private function generateOrderNumber(Tenant $tenant): string
     {
         do {
-            $number = strtoupper($tenant->tenant_code) . now()->format('ymd') . strtoupper(Str::random(4));
-        } while (QuickOrder::where('order_number', $number)->exists());
+            $orderNumber = 'ORDQ-' . strtoupper($tenant->tenant_code) . '-' . now()->format('ymd') . '-' . strtoupper(Str::random(4));
+        } while (QuickOrder::where('order_number', $orderNumber)->exists());
 
-        return $number;
+        return $orderNumber;
     }
 
     public function render()
@@ -311,6 +471,9 @@ new class extends Component
             return;
         }
 
+        $this->historyPage = 1;
+        unset($this->orderHistory);
+
         $data = $this->chartData;
 
         $this->dispatch('chart-update',
@@ -322,7 +485,11 @@ new class extends Component
 };
 ?>
 
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+<div
+    x-data
+    x-on:open-print-report.window="window.open($event.detail.url, '_blank')"
+    class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6"
+>
 
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -331,16 +498,44 @@ new class extends Component
         </div>
     </div>
 
-    <div class="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
-        <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">Dari Tanggal</label>
-            <input type="date" wire:model.live="customFrom" class="rounded-lg border-gray-300 text-sm focus:ring-2 focus:ring-orange-500">
+    {{-- Filter Tanggal + Laporan Penjualan --}}
+    <div class="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="flex flex-wrap items-end gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Dari Tanggal</label>
+                <input type="date" wire:model.live="customFrom" class="rounded-lg border-gray-300 text-sm focus:ring-2 focus:ring-orange-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1">Sampai Tanggal</label>
+                <input type="date" wire:model.live="customTo" class="rounded-lg border-gray-300 text-sm focus:ring-2 focus:ring-orange-500">
+            </div>
         </div>
-        <div>
-            <label class="block text-xs font-medium text-gray-500 mb-1">Sampai Tanggal</label>
-            <input type="date" wire:model.live="customTo" class="rounded-lg border-gray-300 text-sm focus:ring-2 focus:ring-orange-500">
-        </div>
+
+        <button
+            wire:click="printReport"
+            class="inline-flex items-center gap-x-1.5 rounded-lg bg-orange-500 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-orange-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 transition-colors duration-200"
+        >
+            <flux:icon.document class="size-5"/>
+            <span>Laporan Penjualan</span>
+        </button>
     </div>
+
+        {{-- Input Pesanan Langsung --}}
+    @if ($this->availableProducts->isNotEmpty())
+    <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm flex items-center justify-between">
+        <div>
+            <h3 class="text-sm font-semibold text-gray-800">Pesanan Langsung di Tempat</h3>
+            <p class="text-xs text-gray-500 mt-1">Untuk pelanggan yang memesan langsung di lokasi (bukan pre-order).</p>
+        </div>
+        <button wire:click="openQuickOrder" class="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition">
+            + Buat Pesanan
+        </button>
+    </div>
+    @else
+    <div class="rounded-xl border border-dashed border-gray-300 p-5 text-center text-sm text-gray-400">
+        Tenant belum memiliki produk non pre-order yang tersedia untuk pesanan langsung.
+    </div>
+    @endif
 
     {{-- Ringkasan --}}
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -398,7 +593,6 @@ new class extends Component
                 @forelse ($this->topProducts as $product)
                     <div class="flex items-center justify-between text-sm">
                         <div>
-                            {{-- Modifikasi bagian nama produk untuk menyisipkan badge info --}}
                             <div class="flex items-center gap-2">
                                 <p class="font-medium text-gray-800 truncate max-w-[140px]" title="{{ $product['name'] }}">
                                     {{ $product['name'] }}
@@ -424,23 +618,18 @@ new class extends Component
         </div>
     </div>
 
-    {{-- Laporan / Tabel Pesanan --}}
+    {{-- Riwayat Pesanan (Pre Order + Quick Order) --}}
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div class="px-5 py-4 border-b flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-gray-800">Laporan Pesanan Terbaru</h3>
-            <button 
-                wire:click="printReport" 
-                class="inline-flex items-center gap-x-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-colors duration-200"
-            >
-                <flux:icon.document/>
-                <span>Laporan Penjualan</span>
-            </button>
+        <div class="px-5 py-4 border-b">
+            <h3 class="text-sm font-semibold text-gray-800">Riwayat Pesanan</h3>
+            <p class="text-xs text-gray-500 mt-0.5">Gabungan pesanan pre-order dan pesanan langsung. Klik baris untuk melihat detail.</p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">No. Pesanan</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Jenis</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Bayar</th>
@@ -448,9 +637,20 @@ new class extends Component
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    @forelse ($this->recentOrders as $order)
-                        <tr wire:key="report-order-{{ $order->id }}">
+                    @forelse ($this->orderHistory['items'] as $order)
+                        <tr
+                            wire:key="report-order-{{ $order->key }}"
+                            wire:click="viewOrderDetail('{{ $order->type }}', {{ $order->id }})"
+                            class="cursor-pointer hover:bg-gray-50 transition"
+                        >
                             <td class="px-4 py-2 text-sm font-medium text-gray-800">{{ $order->order_number }}</td>
+                            <td class="px-4 py-2 text-sm">
+                                @if ($order->type === 'preorder')
+                                    <span class="inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">Pre Order</span>
+                                @else
+                                    <span class="inline-flex items-center rounded bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20">Langsung</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-2 text-sm text-gray-500">{{ $order->created_at->format('d/m/Y H:i') }}</td>
                             <td class="px-4 py-2 text-sm text-gray-600">{{ $order->status }}</td>
                             <td class="px-4 py-2 text-sm text-gray-600">{{ $order->payment_method }}</td>
@@ -458,30 +658,38 @@ new class extends Component
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-400">Belum ada pesanan pada periode ini.</td>
+                            <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-400">Belum ada pesanan pada periode ini.</td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-    </div>
 
-    {{-- Input Pesanan Langsung --}}
-    @if ($this->availableProducts->isNotEmpty())
-        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm flex items-center justify-between">
-            <div>
-                <h3 class="text-sm font-semibold text-gray-800">Pesanan Langsung di Tempat</h3>
-                <p class="text-xs text-gray-500 mt-1">Untuk pelanggan yang memesan langsung di lokasi (bukan pre-order).</p>
+        @if ($this->orderHistory['total'] > 0)
+            <div class="px-5 py-3 border-t flex items-center justify-between text-xs text-gray-500">
+                <span>
+                    Halaman {{ $this->orderHistory['current_page'] }} dari {{ $this->orderHistory['last_page'] }}
+                    ({{ $this->orderHistory['total'] }} pesanan)
+                </span>
+                <div class="flex items-center gap-2">
+                    <button
+                        wire:click="setHistoryPage({{ $this->orderHistory['current_page'] - 1 }})"
+                        @disabled($this->orderHistory['current_page'] <= 1)
+                        class="rounded-lg border border-gray-200 px-2.5 py-1 font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        Sebelumnya
+                    </button>
+                    <button
+                        wire:click="setHistoryPage({{ $this->orderHistory['current_page'] + 1 }})"
+                        @disabled($this->orderHistory['current_page'] >= $this->orderHistory['last_page'])
+                        class="rounded-lg border border-gray-200 px-2.5 py-1 font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        Berikutnya
+                    </button>
+                </div>
             </div>
-            <button wire:click="openQuickOrder" class="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition">
-                + Buat Pesanan
-            </button>
-        </div>
-    @else
-        <div class="rounded-xl border border-dashed border-gray-300 p-5 text-center text-sm text-gray-400">
-            Tenant belum memiliki produk non pre-order yang tersedia untuk pesanan langsung.
-        </div>
-    @endif
+        @endif
+    </div>
 
     {{-- Modal Quick Order --}}
     <div wire:show="showQuickOrder" wire:cloak class="fixed inset-0 z-50 overflow-y-auto">
@@ -550,6 +758,77 @@ new class extends Component
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal Detail Pesanan --}}
+    <div wire:show="showOrderDetail" wire:cloak class="fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="fixed inset-0 bg-black/50" wire:click="closeOrderDetail"></div>
+
+            <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full mx-auto max-h-[90vh] flex flex-col">
+                <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-800">Detail Pesanan</h3>
+                    <button wire:click="closeOrderDetail" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                @if ($selectedOrder)
+                    <div class="flex-1 overflow-y-auto p-6 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-800">{{ $selectedOrder['order_number'] }}</p>
+                                <p class="text-xs text-gray-500">{{ $selectedOrder['created_at'] }}</p>
+                            </div>
+                            @if ($selectedOrder['type'] === 'preorder')
+                                <span class="inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">Pre Order</span>
+                            @else
+                                <span class="inline-flex items-center rounded bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20">Langsung</span>
+                            @endif
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <p class="text-xs text-gray-500">Status</p>
+                                <p class="font-medium text-gray-800">{{ $selectedOrder['status'] }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Pembayaran</p>
+                                <p class="font-medium text-gray-800">{{ $selectedOrder['payment_method'] }} &middot; {{ $selectedOrder['payment_status'] }}</p>
+                            </div>
+                            @if ($selectedOrder['pickup_day'])
+                                <div class="col-span-2">
+                                    <p class="text-xs text-gray-500">Jadwal Pengambilan</p>
+                                    <p class="font-medium text-gray-800">
+                                        {{ $selectedOrder['pickup_day'] }}, {{ $selectedOrder['pickup_start'] }} - {{ $selectedOrder['pickup_end'] }}
+                                    </p>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="border-t pt-3 space-y-2">
+                            <p class="text-xs font-medium text-gray-500 uppercase">Item Pesanan</p>
+                            @foreach ($selectedOrder['items'] as $item)
+                                <div class="flex items-center justify-between text-sm">
+                                    <div>
+                                        <p class="text-gray-800">{{ $item['name'] }}</p>
+                                        <p class="text-xs text-gray-500">{{ $item['quantity'] }} x Rp{{ number_format($item['price'], 0, ',', '.') }}</p>
+                                    </div>
+                                    <span class="text-gray-700 font-medium">Rp{{ number_format($item['subtotal'], 0, ',', '.') }}</span>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <div class="border-t pt-3 flex items-center justify-between">
+                            <span class="text-sm font-semibold text-gray-800">Total</span>
+                            <span class="text-lg font-bold text-gray-900">Rp{{ number_format($selectedOrder['total_amount'], 0, ',', '.') }}</span>
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     </div>

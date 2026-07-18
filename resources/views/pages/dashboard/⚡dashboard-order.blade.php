@@ -142,7 +142,7 @@ new class extends Component
     {{-- Header --}}
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h2 class="text-2xl font-bold text-gray-800">Kelola Pesanan</h2>
+            <h2 class="text-2xl font-bold text-gray-800">Kelola Pesanan Pre-Order</h2>
         </div>
 
         <div class="relative w-full sm:w-72 group">
