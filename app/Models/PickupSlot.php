@@ -11,7 +11,6 @@ class PickupSlot extends Model
         'dayPickup',
         'start_time',
         'end_time',
-        'label',
     ];
 
     public function tenant()

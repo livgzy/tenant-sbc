@@ -13,11 +13,12 @@ class QuickOrder extends Model
         'order_number',
         'tenant_id',
         'total_amount',
+        'payment_method',
     ];
 
     public function items()
     {
-        return $this->hasMany(QuickOrderItem::class);
+        return $this->hasMany(QuickOrderItem::class, 'quick_order_id');
     }
 
     public function tenant()

@@ -95,31 +95,33 @@ new class extends Component
     
     public function mount()
     {
-        $user = Auth::guard('tenant')->user();
-        $reservation = $user->reservation()->latest()->first();
-        
-        $tenant = $reservation->tenant;
-
-        if (!$reservation || !$reservation->tenant) {
+        if (!$this->reservation?->tenant) {
             return redirect()->route('home');
         }
         
-        $this->tenant_id = $tenant->id;
-        $this->store_name = $tenant->store_name;
-        $this->tenant_code = $tenant->tenant_code;
-        $this->description = $tenant->description;
-        $this->phone = $tenant->phone;
-        $this->is_open = $tenant->is_open;
-        $this->existing_image = $tenant->tenant_img;
+        $this->tenant_id = $this->reservation?->tenant->id;
+        $this->store_name = $this->reservation?->tenant->store_name;
+        $this->tenant_code = $this->reservation?->tenant->tenant_code;
+        $this->description = $this->reservation?->tenant->description;
+        $this->phone = $this->reservation?->tenant->phone;
+        $this->is_open = $this->reservation?->tenant->is_open;
+        $this->existing_image = $this->reservation?->tenant->tenant_img;
         
-        $this->user_name = $user->name;
-        $this->user_email = $user->email;
-        $this->user_phone = $user->phone;
-        $this->user_nim = $user->nim;
-        $this->user_prodi = $user->prodi;
-        $this->user_semester = $user->semester;
+        $this->user_name = $this->reservation?->user->name;
+        $this->user_email = $this->reservation?->user->email;
+        $this->user_phone = $this->reservation?->user->phone;
+        $this->user_nim = $this->reservation?->user->nim;
+        $this->user_prodi = $this->reservation?->user->prodi;
+        $this->user_semester = $this->reservation?->user->semester;
         
         $this->loadPickupSlots();
+    }
+
+    #[Computed]
+    public function reservation()
+    {
+        $reservation = Auth::guard('tenant')->user()->reservation()->latest()->first();
+        return $reservation;
     }
 
     #[Computed]
@@ -131,7 +133,7 @@ new class extends Component
     #[Computed]
     public function totalOrders()
     {
-        return Order::where('data_tenant->tenant_code', $this->tenant_code)->where('status', '!=', 'Dibatalkan')->count();
+        return Order::where('data_tenant->reservation_id', $this->reservation->id)->where('status', '!=', 'Dibatalkan')->count();
     }
     
     public function loadPickupSlots()
@@ -293,7 +295,7 @@ new class extends Component
             $hasPickupSlot = PickupSlot::where('tenant_id', $tenant->id)->exists();
 
             if (!$hasPickupSlot) {
-                $errors[] = 'Tenant memiliki produk pre-order, sehingga wajib memiliki minimal 1 slot pickup.';
+                $errors[] = 'Tenant memiliki produk pre-order, sehingga wajib memiliki minimal 1 slot waktu buka.';
             }
         }
 
@@ -316,8 +318,8 @@ new class extends Component
         // 4. Tenant — store_name & phone wajib diisi
         if (blank($tenant->store_name) || blank($tenant->phone)) {
             $errors[] = 'Nama tenant dan nomor telepon tenant harus diisi.';
-        }
 
+        }
         return $errors;
     }
 

@@ -15,7 +15,6 @@ class Product extends Model
         'price',
         'is_available',
         'is_preorder',
-        'dayPreorder',
         'product_img',
     ];
 

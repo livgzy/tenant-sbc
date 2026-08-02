@@ -31,19 +31,19 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('tenant-dashboard-access', function (UserTenant $user) {
             $hasAccess = $user->isTenant === true;
         
-            // $latestReservation = $user->reservation()->latest()->first();
-            // $hasActiveReservation = $latestReservation?->tenant?->reservation_id !== null;
+            $latestReservation = $user->reservation()->latest()->first();
+            $hasActiveReservation = $latestReservation?->tenant?->reservation_id !== null;
         
-            return $hasAccess;
+            return $hasAccess && $hasActiveReservation;
         });
 
         Gate::define('reservation-access', function (UserTenant $user) {
             $isTenant = $user->isTenant === true;
         
             $latestReservation = $user->reservation()->latest()->first();
-            // $hasActiveReservation = $latestReservation?->tenant?->reservation_id !== null;
+            $hasActiveReservation = $latestReservation?->tenant?->reservation_id !== null;
         
-            return !$isTenant;
+            return !$hasActiveReservation;
         });
     }
 

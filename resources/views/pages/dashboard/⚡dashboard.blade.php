@@ -27,7 +27,7 @@ new class extends Component
         }
 
         return Order::query()
-            ->where('data_tenant->tenant_code', $tenant->tenant_code);
+            ->where('data_tenant->reservation_id', $this->tenant->reservation_id);
     }
 
     private function quickOrdersQuery()

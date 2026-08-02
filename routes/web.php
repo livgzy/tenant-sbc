@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 
 Route::redirect('/', '/dashboard');
-Route::middleware(['auth:tenant', 'can:tenant-dashboard-access'])->group(function () {
+Route::middleware(['auth:tenant', 'tenant-dashboard-access'])->group(function () {
     Route::livewire('/dashboard', 'pages::dashboard.dashboard')->name('home');
     Route::livewire('/dashboard/menu', 'pages::dashboard.dashboard-menu')->name('tenant.menu');
     Route::livewire('/dashboard/menu/add', 'pages::dashboard.dashboard-menu-add')->name('tenant.menu.add');
@@ -18,7 +18,7 @@ Route::middleware(['auth:tenant', 'can:tenant-dashboard-access'])->group(functio
     Route::get('/dashboard/report/print', TenantReportPrintController::class)->name('report.print');
 });
 
-Route::middleware(['auth:tenant', 'can:reservation-access'])->group(function () {
+Route::middleware(['auth:tenant', 'reservation-access'])->group(function () {
     Route::livewire('/reservasi', 'pages::dashboard.reservasi')->name('tenant.reservation');
 
 });

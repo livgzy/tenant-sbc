@@ -8,10 +8,10 @@ use App\Models\UserTenant;
 
 new class extends Component
 {
-    #[Validate('required|min:11|max:15')]
+    #[Validate('required|min:11|max:15|unique:user_tenants,nim')]
     public $nim = '';
 
-    #[Validate('required|min:3|max:100')]
+    #[Validate('required|max:100')]
     public $name = '';
 
     #[Validate('required|string')]
@@ -20,7 +20,7 @@ new class extends Component
     #[Validate('required|min:1|max:14')]
     public $semester = '';
     
-    #[Validate('required|email|unique:users,email')]
+    #[Validate('required|email|unique:user_tenants,email')]
     public $email = '';
     
     #[Validate('required|min:10|max:15')]

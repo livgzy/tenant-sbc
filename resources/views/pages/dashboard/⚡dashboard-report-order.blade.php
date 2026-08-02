@@ -22,6 +22,7 @@ new class extends Component
 
     public bool $showQuickOrder = false;
     public array $cart = [];
+    public string $quickPaymentMethod = 'Tunai';
 
     public int $historyPage = 1;
 
@@ -63,7 +64,7 @@ new class extends Component
         [$from, $to] = $this->dateRange();
 
         return Order::query()
-            ->where('data_tenant->tenant_code', $this->tenant->tenant_code)
+            ->where('data_tenant->reservation_id', $this->tenant->reservation_id)
             ->whereBetween('created_at', [$from, $to]);
     }
 
@@ -147,7 +148,7 @@ new class extends Component
 
         $items = OrderItem::query()
             ->whereHas('order', function ($q) {
-                $q->where('data_tenant->tenant_code', $this->tenant->tenant_code)
+                $q->where('data_tenant->reservation_id', $this->tenant->reservation_id)
                   ->where('status', '!=', 'Dibatalkan');
             })
             ->get()
@@ -200,7 +201,7 @@ new class extends Component
             'order_number' => $order->order_number,
             'created_at' => $order->created_at,
             'status' => 'Selesai',
-            'payment_method' => 'Dibayar di Tempat',
+            'payment_method' => $order->payment_method,
             'total_amount' => $order->total_amount,
         ]);
 
@@ -231,8 +232,8 @@ new class extends Component
         $tenant = $this->tenant;
 
         if ($type === 'preorder') {
-            $order = Order::with('items')
-                ->where('data_tenant->tenant_code', $tenant->tenant_code)
+            $order = Order::with(['items', 'user'])
+                ->where('data_tenant->reservation_id', $this->tenant->reservation_id)
                 ->find($id);
 
             if (! $order) {
@@ -245,16 +246,27 @@ new class extends Component
                 'order_number' => $order->order_number,
                 'created_at' => $order->created_at->format('d/m/Y H:i'),
                 'status' => $order->status,
+                'customer_name' => $order->user->name ?? '-',
+                'customer_phone' => $order->user->phone ?? null,
                 'payment_method' => $order->payment_method,
                 'payment_status' => $order->payment_status,
+                'payment_type' => $this->formatPaymentType(data_get($order->data_payment_method, 'type')),
+                'payment_name' => data_get($order->data_payment_method, 'name_payment'),
+                'payment_proof_url' => $order->payment_proof_img,
                 'total_amount' => $order->total_amount,
                 'pickup_day' => data_get($order->data_pickup_slot, 'dayPickup'),
                 'pickup_start' => data_get($order->data_pickup_slot, 'start_time'),
                 'pickup_end' => data_get($order->data_pickup_slot, 'end_time'),
+                'pickup_time' => $order->pickup_time
+                    ? \Carbon\Carbon::parse($order->pickup_time)->format('H:i')
+                    : null,
                 'items' => $order->items->map(fn ($item) => [
                     'name' => data_get($item->data_product, 'name', '-'),
+                    'category' => data_get($item->data_product, 'category_name'),
+                    'is_preorder' => (bool) data_get($item->data_product, 'is_preorder', false),
                     'price' => (float) data_get($item->data_product, 'price', 0),
                     'quantity' => $item->quantity,
+                    'notes' => $item->notes,
                     'subtotal' => $item->quantity * (float) data_get($item->data_product, 'price', 0),
                 ])->toArray(),
             ];
@@ -273,22 +285,46 @@ new class extends Component
                 'order_number' => $order->order_number,
                 'created_at' => $order->created_at->format('d/m/Y H:i'),
                 'status' => 'Selesai',
-                'payment_method' => 'Dibayar di Tempat',
+
+                'customer_name' => null,
+                'customer_phone' => null,
+
+                'payment_method' => $order->payment_method,
                 'payment_status' => 'Sudah Dibayar',
+                'payment_type' => null,
+                'payment_name' => null,
+                'payment_proof_url' => null,
+
                 'total_amount' => $order->total_amount,
+
                 'pickup_day' => null,
                 'pickup_start' => null,
                 'pickup_end' => null,
+                'pickup_time' => null,
+
                 'items' => $order->items->map(fn ($item) => [
                     'name' => $item->product->name ?? '-',
+                    'category' => $item->product->category->name ?? null,
+                    'is_preorder' => (bool) ($item->product->is_preorder ?? false),
                     'price' => (float) $item->price,
                     'quantity' => $item->quantity,
+                    'notes' => null,
                     'subtotal' => $item->quantity * (float) $item->price,
                 ])->toArray(),
             ];
         }
 
         $this->showOrderDetail = true;
+    }
+
+    private function formatPaymentType(?string $type): ?string
+    {
+        return match ($type) {
+            'e_wallet' => 'E Wallet',
+            'bank_transfer' => 'Bank Transfer',
+            'qris' => 'QRIS',
+            default => $type ? Str::headline($type) : null,
+        };
     }
 
     public function closeOrderDetail(): void
@@ -362,6 +398,7 @@ new class extends Component
     {
         $this->showQuickOrder = false;
         $this->cart = [];
+        $this->quickPaymentMethod = 'Tunai';
     }
 
     public function incrementQty(int $productId): void
@@ -404,6 +441,11 @@ new class extends Component
             return;
         }
 
+        if (! in_array($this->quickPaymentMethod, ['Tunai', 'Non Tunai'], true)) {
+            $this->dispatch('notify', type: 'error', message: 'Metode pembayaran tidak valid.');
+            return;
+        }
+
         if (! $tenant->is_open) {
             $this->dispatch('notify', type: 'error', message: 'Tenant harus berstatus buka untuk membuat pesanan langsung.');
             return;
@@ -429,6 +471,7 @@ new class extends Component
                 'order_number' => $this->generateOrderNumber($tenant),
                 'tenant_id' => $tenant->id,
                 'total_amount' => $totalAmount,
+                'payment_method' => $this->quickPaymentMethod,
             ]);
 
             foreach ($this->cart as $productId => $qty) {
@@ -444,6 +487,7 @@ new class extends Component
 
         $this->cart = [];
         $this->showQuickOrder = false;
+        $this->quickPaymentMethod = 'Tunai';
         $this->historyPage = 1;
 
         unset($this->summary, $this->chartData, $this->topProducts, $this->orderHistory, $this->cartItems, $this->cartTotal);
@@ -706,15 +750,15 @@ new class extends Component
                     </button>
                 </div>
 
-                <div class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-3 gap-0">
-                    <div class="md:col-span-2 p-6 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-3 gap-0 items-start">
+                    <div class="md:col-span-2 p-6 grid grid-cols-2 sm:grid-cols-3 gap-3 content-start">
                         @foreach ($this->availableProducts as $product)
                             <div wire:key="qo-product-{{ $product->id }}" class="rounded-xl border border-gray-200 overflow-hidden">
                                 <img src="{{ Storage::url($product->product_img) }}" alt="{{ $product->name }}" class="h-20 w-full object-contain">
                                 <div class="p-2">
                                     <p class="text-xs font-medium text-gray-800 truncate">{{ $product->name }}</p>
                                     <p class="text-xs text-gray-500">Rp{{ number_format($product->price, 0, ',', '.') }}</p>
-
+                
                                     @php $qty = $this->cart[$product->id] ?? 0; @endphp
                                     <div class="mt-2 flex items-center justify-between">
                                         <button wire:click="decrementQty({{ $product->id }})" class="w-6 h-6 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200">-</button>
@@ -724,11 +768,10 @@ new class extends Component
                                 </div>
                             </div>
                         @endforeach
-                    </div>
-
+                    </div>     
                     <div class="border-t md:border-t-0 md:border-l border-gray-200 p-6 space-y-3">
                         <h4 class="text-sm font-semibold text-gray-800">Keranjang</h4>
-
+                
                         @forelse ($this->cartItems as $item)
                             <div wire:key="qo-cart-{{ $item['product']->id }}" class="flex items-center justify-between text-sm">
                                 <div>
@@ -743,12 +786,34 @@ new class extends Component
                         @empty
                             <p class="text-sm text-gray-400">Belum ada produk dipilih.</p>
                         @endforelse
-
+                
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 mb-2">Metode Pembayaran</p>
+                            <div class="flex gap-2">
+                                @foreach (['Tunai', 'Non Tunai'] as $method)
+                                    <label class="flex-1 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            wire:model.live="quickPaymentMethod"
+                                            value="{{ $method }}"
+                                            class="peer sr-only"
+                                        >
+                                        <div class="text-center px-3 py-2 rounded-lg text-sm font-medium border transition-all duration-200
+                                            bg-white text-gray-600 border-gray-200 shadow-sm
+                                            peer-checked:bg-orange-500 peer-checked:text-white peer-checked:border-orange-500 peer-checked:shadow-md
+                                            hover:bg-gray-50">
+                                            {{ $method }}
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                
                         <div class="border-t pt-3 flex items-center justify-between">
                             <span class="text-sm font-semibold text-gray-800">Total</span>
                             <span class="text-lg font-bold text-gray-900">Rp{{ number_format($this->cartTotal, 0, ',', '.') }}</span>
                         </div>
-
+                
                         <button
                             wire:click="submitQuickOrder"
                             wire:confirm="Buat pesanan langsung senilai Rp{{ number_format($this->cartTotal, 0, ',', '.') }}?"
@@ -779,6 +844,8 @@ new class extends Component
 
                 @if ($selectedOrder)
                     <div class="flex-1 overflow-y-auto p-6 space-y-4">
+
+                        {{-- Header --}}
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-semibold text-gray-800">{{ $selectedOrder['order_number'] }}</p>
@@ -791,34 +858,150 @@ new class extends Component
                             @endif
                         </div>
 
+                        {{-- Pelanggan --}}
+                        @if ($selectedOrder['customer_name'])
+                            <div class="rounded-lg bg-gray-50 px-3 py-2">
+                                <p class="text-xs text-gray-500">Pelanggan</p>
+                                <p class="text-sm font-medium text-gray-800">
+                                    {{ $selectedOrder['customer_name'] }}
+                                    @if ($selectedOrder['customer_phone'])
+                                        &middot; {{ $selectedOrder['customer_phone'] }}
+                                    @endif
+                                </p>
+                            </div>
+                        @endif
+
+                        {{-- Status & Pembayaran --}}
                         <div class="grid grid-cols-2 gap-3 text-sm">
                             <div>
-                                <p class="text-xs text-gray-500">Status</p>
-                                <p class="font-medium text-gray-800">{{ $selectedOrder['status'] }}</p>
+                                <p class="text-xs text-gray-500">Status Pesanan</p>
+                                <p @class([
+                                    'font-medium inline-flex items-center rounded px-1.5 py-0.5 text-xs ring-1 ring-inset mt-0.5',
+                                    'bg-yellow-50 text-yellow-700 ring-yellow-600/20' => $selectedOrder['status'] === 'Pending',
+                                    'bg-blue-50 text-blue-700 ring-blue-600/20' => $selectedOrder['status'] === 'Diproses',
+                                    'bg-purple-50 text-purple-700 ring-purple-600/20' => $selectedOrder['status'] === 'Siap Diambil',
+                                    'bg-green-50 text-green-700 ring-green-600/20' => $selectedOrder['status'] === 'Selesai',
+                                    'bg-red-50 text-red-700 ring-red-600/20' => $selectedOrder['status'] === 'Dibatalkan',
+                                ])>{{ $selectedOrder['status'] }}</p>
                             </div>
                             <div>
-                                <p class="text-xs text-gray-500">Pembayaran</p>
-                                <p class="font-medium text-gray-800">{{ $selectedOrder['payment_method'] }} &middot; {{ $selectedOrder['payment_status'] }}</p>
+                                <p class="text-xs text-gray-500">Status Bayar</p>
+                                <p @class([
+                                    'font-medium inline-flex items-center rounded px-1.5 py-0.5 text-xs ring-1 ring-inset mt-0.5',
+                                    'bg-red-50 text-red-700 ring-red-600/20' => $selectedOrder['payment_status'] === 'Belum Dibayar',
+                                    'bg-yellow-50 text-yellow-700 ring-yellow-600/20' => $selectedOrder['payment_status'] === 'Menunggu Konfirmasi',
+                                    'bg-green-50 text-green-700 ring-green-600/20' => $selectedOrder['payment_status'] === 'Sudah Dibayar',
+                                ])>{{ $selectedOrder['payment_status'] }}</p>
                             </div>
-                            @if ($selectedOrder['pickup_day'])
-                                <div class="col-span-2">
-                                    <p class="text-xs text-gray-500">Jadwal Pengambilan</p>
+                            <div>
+                                <p class="text-xs text-gray-500">Metode Pembayaran</p>
+                                <p class="font-medium text-gray-800">{{ $selectedOrder['payment_method'] }}</p>
+                            </div>
+                            @if ($selectedOrder['payment_type'] || $selectedOrder['payment_name'])
+                                <div>
+                                    <p class="text-xs text-gray-500">Detail Pembayaran</p>
                                     <p class="font-medium text-gray-800">
-                                        {{ $selectedOrder['pickup_day'] }}, {{ $selectedOrder['pickup_start'] }} - {{ $selectedOrder['pickup_end'] }}
+                                        {{ $selectedOrder['payment_type'] }}
+                                        @if ($selectedOrder['payment_name']) &middot; {{ $selectedOrder['payment_name'] }} @endif
                                     </p>
                                 </div>
                             @endif
                         </div>
 
-                        <div class="border-t pt-3 space-y-2">
+                        {{-- Bukti Pembayaran (Non Tunai) --}}
+                        @if ($selectedOrder['payment_proof_url'])
+                        <div x-data="{ showImagePreview: false }">
+                            <p class="text-xs text-gray-500 mb-1">Bukti Pembayaran</p>
+
+                            <button type="button" @click="showImagePreview = true" class="group relative inline-block">
+                                <img src="{{ Storage::url($selectedOrder['payment_proof_url']) }}"
+                                    alt="Bukti Pembayaran"
+                                    class="w-full max-h-56 object-contain rounded-lg border border-gray-200 transition group-hover:brightness-90">
+                                <span class="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-lg transition">
+                                    <svg class="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.35 4.35a7.5 7.5 0 0012.3 12.3zM10.5 7.5v6m-3-3h6"></path>
+                                    </svg>
+                                </span>
+                            </button>
+
+                            <div
+                                x-show="showImagePreview"
+                                x-cloak
+                                @keydown.escape.window="showImagePreview = false"
+                                x-transition:enter="transition ease-out duration-200"
+                                x-transition:enter-start="opacity-0"
+                                x-transition:enter-end="opacity-100"
+                                x-transition:leave="transition ease-in duration-150"
+                                x-transition:leave-start="opacity-100"
+                                x-transition:leave-end="opacity-0"
+                                class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+                                style="display: none;"
+                            >
+                                {{-- Backdrop --}}
+                                <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="showImagePreview = false"></div>
+
+                                {{-- Konten Image --}}
+                                <div
+                                    x-show="showImagePreview"
+                                    x-transition:enter="transition ease-out duration-200"
+                                    x-transition:enter-start="opacity-0 scale-95"
+                                    x-transition:enter-end="opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-150"
+                                    x-transition:leave-start="opacity-100 scale-100"
+                                    x-transition:leave-end="opacity-0 scale-95"
+                                    class="relative max-w-3xl w-full"
+                                >
+                                    {{-- Tombol Close --}}
+                                    <button type="button" @click="showImagePreview = false"
+                                            class="absolute -top-10 right-0 text-white/80 hover:text-white transition">
+                                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+
+                                    {{-- Gambar Full --}}
+                                    <img src="{{ Storage::url($selectedOrder['payment_proof_url']) }}"
+                                        alt="Bukti Pembayaran"
+                                        class="w-full max-h-[85vh] object-contain rounded-xl shadow-2xl">
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+
+                        {{-- Jadwal Pengambilan --}}
+                        @if ($selectedOrder['pickup_day'])
+                            <div>
+                                <p class="text-xs text-gray-500">Jadwal Pengambilan</p>
+                                <p class="font-medium text-gray-800">
+                                    {{ $selectedOrder['pickup_day'] }}, {{ $selectedOrder['pickup_start'] }} - {{ $selectedOrder['pickup_end'] }}
+                                    @if ($selectedOrder['pickup_time'])
+                                        <span class="text-xs text-gray-500">(dipilih: {{ $selectedOrder['pickup_time'] }})</span>
+                                    @endif
+                                </p>
+                            </div>
+                        @endif
+
+                        {{-- Item Pesanan --}}
+                        <div class="border-t pt-3 space-y-3">
                             <p class="text-xs font-medium text-gray-500 uppercase">Item Pesanan</p>
                             @foreach ($selectedOrder['items'] as $item)
-                                <div class="flex items-center justify-between text-sm">
-                                    <div>
-                                        <p class="text-gray-800">{{ $item['name'] }}</p>
+                                <div class="flex items-start justify-between text-sm">
+                                    <div class="flex-1 pr-2">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <p class="text-gray-800 font-medium">{{ $item['name'] }}</p>
+                                            @if ($item['is_preorder'])
+                                                <span class="inline-flex items-center rounded bg-amber-50 px-1 py-0.5 text-[9px] font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20">PO</span>
+                                            @endif
+                                        </div>
+                                        @if ($item['category'])
+                                            <p class="text-[11px] text-gray-400">{{ $item['category'] }}</p>
+                                        @endif
                                         <p class="text-xs text-gray-500">{{ $item['quantity'] }} x Rp{{ number_format($item['price'], 0, ',', '.') }}</p>
+                                        @if ($item['notes'])
+                                            <p class="text-xs text-gray-500 italic mt-0.5">Catatan: {{ $item['notes'] }}</p>
+                                        @endif
                                     </div>
-                                    <span class="text-gray-700 font-medium">Rp{{ number_format($item['subtotal'], 0, ',', '.') }}</span>
+                                    <span class="text-gray-700 font-medium whitespace-nowrap">Rp{{ number_format($item['subtotal'], 0, ',', '.') }}</span>
                                 </div>
                             @endforeach
                         </div>

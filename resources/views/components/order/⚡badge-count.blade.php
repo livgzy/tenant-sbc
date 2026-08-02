@@ -14,7 +14,7 @@ new class extends Component
         $tenant = $reservation ? $reservation->tenant : null;
 
         return Order::where('status', 'Pending')
-        ->where('data_tenant->tenant_code', $tenant->tenant_code)
+        ->where('data_tenant->reservation_id', $reservation->id)
         ->count();
     }
 };

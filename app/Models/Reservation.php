@@ -11,8 +11,10 @@ class Reservation extends Model
         'start_date',
         'statusApprove',
         'end_date',
-        'reasons',
         'is_acknowledged',
+        'activated_at',
+        'is_ended',
+        'reasons',
     ];
     
     protected $casts = [

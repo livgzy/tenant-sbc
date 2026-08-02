@@ -10,7 +10,7 @@
 
         @livewireStyles
     </head>
-    <body x-data="{ sidebarOpen: false }">
+    <body x-data="{ sidebarOpen: false }" class="overflow-hidden">
     
         <div class="flex h-screen overflow-hidden">
             
@@ -209,7 +209,7 @@
                 </header>
     
                 <!-- Main Content -->
-                <main class="flex-1 overflow-x-hidden overflow-y-auto p-6">
+                <main class="flex-1 overflow-y-auto p-6">
                     {{ $slot }}
                 </main>
                 <div

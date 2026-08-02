@@ -37,8 +37,7 @@ new class extends Component
     public function orders()
     {
         return Order::query()
-            // data_tenant di-snapshot per order, jadi filter tenant cukup lewat tenant_code
-            ->where('data_tenant->tenant_code', $this->tenant->tenant_code)
+            ->where('data_tenant->reservation_id', $this->tenant?->reservation_id)
             ->when($this->statusFilter !== 'Semua', fn ($q) => $q->where('status', $this->statusFilter))
             ->when($this->search !== '', fn ($q) => $q->where('order_number', 'like', "%{$this->search}%"))
             ->with(['user', 'items'])
@@ -50,7 +49,7 @@ new class extends Component
     public function statusCounts()
     {
         return Order::query()
-            ->where('data_tenant->tenant_code', $this->tenant->tenant_code)
+            ->where('data_tenant->reservation_id', $this->tenant?->reservation_id)
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
@@ -127,7 +126,7 @@ new class extends Component
     {
         return Order::query()
             ->where('id', $orderId)
-            ->where('data_tenant->tenant_code', $this->tenant->tenant_code)
+            ->where('data_tenant->reservation_id', $this->tenant?->reservation_id)
             ->first();
     }
 

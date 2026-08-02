@@ -21,7 +21,7 @@ class TenantReportPrintController extends Controller
         $to = Carbon::parse($request->query('to') ?: now())->endOfDay();
 
         $orders = Order::query()
-            ->where('data_tenant->tenant_code', $tenant->tenant_code)
+            ->where('data_tenant->reservation_id', $reservation->id)
             ->whereBetween('created_at', [$from, $to])
             ->get();
 
