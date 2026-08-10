@@ -5,6 +5,7 @@ use Livewire\Attributes\Validate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use App\Models\UserTenant;
+use Illuminate\Support\Facades\Storage;
 
 new class extends Component
 {
@@ -62,7 +63,7 @@ new class extends Component
         <div class="absolute -left-10 top-1/2 -translate-y-1/2 w-72 h-72 bg-yellow-200 rounded-full opacity-70"></div>
         <div class="absolute left-32 top-28 w-80 h-80 bg-orange-200 rounded-full opacity-70"></div>
         <div class="relative z-10">
-            <img src="{{ asset('storage/logo/logo_ucic.png') }}" class="w-100 h-100 object-contain" alt="">
+            <img src="{{  Storage::disk('public')->url('logo/logo_ucic.png') }}" class="w-100 h-100 object-contain" alt="">
         </div>
     </div>
 

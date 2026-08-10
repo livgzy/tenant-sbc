@@ -29,7 +29,7 @@
         <div class="text-center border-b pb-4 mb-6">
             {{-- Logo di atas teks, ukuran disesuaikan menjadi h-16 (lebih proporsional untuk susunan vertikal) --}}
             <h1 class="text-lg font-bold text-gray-900">STUDENT BUSINESS CORNER</h1>
-            <img src="{{ asset('storage/logo/logo_ucic.png') }}" 
+            <img src="{{ Illuminate\Support\Facades\Storage::disk('public')->url('logo/logo_ucic.png') }}" 
                  alt="Logo" 
                  class="h-16 w-auto mx-auto object-contain mb-3">
                  

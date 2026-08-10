@@ -275,7 +275,7 @@ new class extends Component
                         <p class="mb-1 text-xs font-medium text-gray-500">Bukti Pembayaran</p>
                         <div x-data="{ showImagePreview: false }">
                             <button type="button" @click="showImagePreview = true" class="group relative inline-block">
-                                <img src="{{ Storage::url($order->payment_proof_img) }}"
+                                <img src="{{ Storage::disk('public')->url($order->payment_proof_img) }}"
                                     alt="Bukti Pembayaran"
                                     class="max-h-48 rounded-xl border border-gray-200 transition group-hover:brightness-90">
                                 <span class="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-xl transition">
@@ -320,7 +320,7 @@ new class extends Component
                                     </button>
 
                                     <!-- Gambar Full -->
-                                    <img src="{{ Storage::url($order->payment_proof_img) }}"
+                                    <img src="{{ Storage::disk('public')->url($order->payment_proof_img) }}"
                                         alt="Bukti Pembayaran"
                                         class="w-full max-h-[85vh] object-contain rounded-xl shadow-2xl">
                                 </div>

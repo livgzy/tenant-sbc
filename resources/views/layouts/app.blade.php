@@ -35,7 +35,7 @@
                     <div class="relative px-6 py-6 bg-gradient-to-r from-orange-500 to-amber-500">
                         <div class="flex items-center justify-between">
                             <a href="/">
-                                <img src="{{ asset('storage/logo/logo_ucic.png') }}" 
+                                <img src="{{Illuminate\Support\Facades\Storage::disk('public')->url('logo/logo_ucic.png')}}" 
                                         alt="Logo" 
                                         class="h-14 sm:h-12 w-auto object-contain">
                             </a>

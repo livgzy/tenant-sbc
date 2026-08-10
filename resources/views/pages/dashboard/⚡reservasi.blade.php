@@ -267,7 +267,7 @@ new class extends Component
             'price' => $this->temp_product_price,
             'is_preorder' => $this->temp_product_is_preorder,
             'preview_path' => $previewPath, 
-            'temp_image_url' => Storage::url($previewPath), 
+            'temp_image_url' => Storage::disk('public')->url($previewPath), 
         ];
         
         $this->reset(['temp_product_name', 'temp_product_category', 'temp_product_description', 'temp_product_price', 'temp_product_is_preorder', 'temp_product_img']);

@@ -754,7 +754,7 @@ new class extends Component
                     <div class="md:col-span-2 p-6 grid grid-cols-2 sm:grid-cols-3 gap-3 content-start">
                         @foreach ($this->availableProducts as $product)
                             <div wire:key="qo-product-{{ $product->id }}" class="rounded-xl border border-gray-200 overflow-hidden">
-                                <img src="{{ Storage::url($product->product_img) }}" alt="{{ $product->name }}" class="h-20 w-full object-contain">
+                                <img src="{{ Storage::disk('public')->url($product->product_img) }}" alt="{{ $product->name }}" class="h-20 w-full object-contain">
                                 <div class="p-2">
                                     <p class="text-xs font-medium text-gray-800 truncate">{{ $product->name }}</p>
                                     <p class="text-xs text-gray-500">Rp{{ number_format($product->price, 0, ',', '.') }}</p>
@@ -914,7 +914,7 @@ new class extends Component
                             <p class="text-xs text-gray-500 mb-1">Bukti Pembayaran</p>
 
                             <button type="button" @click="showImagePreview = true" class="group relative inline-block">
-                                <img src="{{ Storage::url($selectedOrder['payment_proof_url']) }}"
+                                <img src="{{ Storage::disk('public')->url($selectedOrder['payment_proof_url']) }}"
                                     alt="Bukti Pembayaran"
                                     class="w-full max-h-56 object-contain rounded-lg border border-gray-200 transition group-hover:brightness-90">
                                 <span class="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-lg transition">
@@ -960,7 +960,7 @@ new class extends Component
                                     </button>
 
                                     {{-- Gambar Full --}}
-                                    <img src="{{ Storage::url($selectedOrder['payment_proof_url']) }}"
+                                    <img src="{{ Storage::disk('public')->url($selectedOrder['payment_proof_url']) }}"
                                         alt="Bukti Pembayaran"
                                         class="w-full max-h-[85vh] object-contain rounded-xl shadow-2xl">
                                 </div>

@@ -201,7 +201,7 @@ new class extends Component
                     {{-- Gambar --}}
                     <div class="relative h-40 bg-gray-50">
                         @if($product->product_img)
-                            <img src="{{ Storage::url($product->product_img) }}" 
+                            <img src="{{ Storage::disk('public')->url($product->product_img) }}" 
                             class="w-full h-full object-contain bgi" 
                             alt="{{ $product->name }}">
                         @else
