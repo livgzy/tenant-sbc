@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BucketFileController;
 use App\Http\Controllers\TenantReportPrintController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -31,3 +32,7 @@ Route::middleware('guest:tenant')->group(function () {
 Route::middleware('auth:tenant')->group(function () {
     Route::post('/logout', [UserController::class, 'logout']);
 });
+
+Route::get('/files/{path}', [BucketFileController::class, 'show'])
+    ->where('path', '.*')
+    ->name('bucket.file');
