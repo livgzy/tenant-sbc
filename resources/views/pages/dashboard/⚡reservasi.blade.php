@@ -77,10 +77,9 @@ new class extends Component
         $this->products = [];
         $this->isImageUploaded = false;
         $this->bookedRangesJson = '[]';
-        
-        // Buat folder preview jika belum ada
-        if (!Storage::disk('public')->exists('preview')) {
-            Storage::disk('public')->makeDirectory('preview');
+
+        if (!Storage::disk('public')->exists($this->previewFolder())) {
+            Storage::disk('public')->makeDirectory($this->previewFolder());
         }
     }
 
@@ -254,10 +253,10 @@ new class extends Component
         
         // Generate unique filename
         $filename = Str::uuid() . '.' . $this->temp_product_img->extension();
-        $previewPath = 'preview/' . $filename;
-        
-        // Store image to preview folder
-        $storedPath = $this->temp_product_img->storeAs('preview', $filename, 'public');
+        $previewPath = $this->previewFolder() . '/' . $filename;
+
+        $storedPath = $this->temp_product_img->storeAs($this->previewFolder(), $filename, 'public');
+
         
         // Store product data with preview path
         $this->products[] = [
@@ -378,8 +377,14 @@ new class extends Component
                 $newFilename = 'approval_menu/' . basename($oldPath);
                 
                 if (Storage::disk('public')->exists($oldPath)) {
-                    Storage::disk('public')->move($oldPath, $newFilename);
-                    $finalProductImgPath = $newFilename;
+                    if (Storage::disk('public')->move($oldPath, $newFilename)) {
+                        $finalProductImgPath = $newFilename;
+                    } else {
+                        \Log::error('Gagal memindahkan gambar produk dari preview', [
+                            'old' => $oldPath,
+                            'new' => $newFilename,
+                        ]);
+                    }
                 }
             }
             $originalSlug = Str::slug($product['name']);
@@ -412,10 +417,15 @@ new class extends Component
         return redirect("/reservasi");
     }
     
+    private function previewFolder(): string
+    {
+        return 'preview/' . session()->getId();
+    }
+
     private function cleanPreviewFolder()
     {
-        if (Storage::disk('public')->exists('preview')) {
-            $files = Storage::disk('public')->files('preview');
+        if (Storage::disk('public')->exists($this->previewFolder())) {
+            $files = Storage::disk('public')->files($this->previewFolder());
             foreach ($files as $file) {
                 Storage::disk('public')->delete($file);
             }

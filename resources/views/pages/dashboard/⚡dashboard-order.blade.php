@@ -332,6 +332,7 @@ new class extends Component
                 {{-- Aksi --}}
                 <div class="mt-4 flex flex-wrap gap-2">
                     @if ($order->status === 'Pending')
+                        @if ($order->payment_proof_img)                       
                         <button
                             wire:click="acceptOrder({{ $order->id }})"
                             wire:confirm="Terima pesanan {{ $order->order_number }}? Status pembayaran akan diubah menjadi Sudah Dibayar."
@@ -339,6 +340,7 @@ new class extends Component
                         >
                             Terima Pesanan
                         </button>
+                        @endif
                         <button
                             wire:click="cancelOrder({{ $order->id }})"
                             wire:confirm="Batalkan pesanan {{ $order->order_number }}?"
