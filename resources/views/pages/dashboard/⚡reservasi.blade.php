@@ -34,7 +34,7 @@ new class extends Component
     public $temp_product_category = '';
     public $temp_product_description = '';
     public $temp_product_price = '';
-    public $temp_product_is_preorder = '';
+    public $temp_product_is_preorder = 0;
     public $temp_product_img = null;
     
     // Validation flags
