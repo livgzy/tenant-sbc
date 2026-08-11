@@ -18,7 +18,7 @@ new class extends Component
     #[Validate('nullable|string|max:1000')]
     public string $description = '';
 
-    #[Validate('required|numeric|min:0')]
+    #[Validate('required|numeric|min:0|max:99999999')]
     public string $price = '';
 
     #[Validate('required|exists:categories,id')]

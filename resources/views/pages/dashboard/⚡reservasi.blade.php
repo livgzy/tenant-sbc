@@ -55,7 +55,7 @@ new class extends Component
         'products.*.name' => 'required|min:3|max:255',
         'products.*.category' => 'required|string|max:100',
         'products.*.description' => 'nullable|string|max:500',
-        'products.*.price' => 'required|numeric|min:0',
+        'products.*.price' => 'required|numeric|min:0|max:99999999',
         'products.*.is_preorder' => 'nullable',
     ];
     
