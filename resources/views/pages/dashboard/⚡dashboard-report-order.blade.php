@@ -653,9 +653,13 @@ new class extends Component
                                     {{ $selectedOrder['created_at'] }}
                                 </p>
                             </div>
-
+                            @if ($selectedOrder['order_type'] == 'pre_order')
                             <span class="inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
                                 Pre Order
+                            </span>
+                            @else
+                            <span class="inline-flex items-center rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                                Reguler
                             </span>
                         </div>
 
