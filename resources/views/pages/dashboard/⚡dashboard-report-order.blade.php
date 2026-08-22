@@ -235,6 +235,7 @@ new class extends Component
             'customer_phone' => $order->user->phone ?? null,
             'payment_method' => $order->payment_method,
             'payment_status' => $order->payment_status,
+            'order_type' =>  $order->order_type
             'payment_type' => $this->formatPaymentType(
                 data_get($order->data_payment_method, 'type')
             ),
