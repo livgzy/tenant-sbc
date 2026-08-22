@@ -661,6 +661,7 @@ new class extends Component
                             <span class="inline-flex items-center rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
                                 Reguler
                             </span>
+                            @endif
                         </div>
 
                         @if ($selectedOrder['customer_name'])
