@@ -128,6 +128,7 @@ new class extends Component
             ->with(['user', 'items.product', 'paymentBatch'])
             ->first();
     }
+    
 
     public function render()
     {
