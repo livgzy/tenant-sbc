@@ -49,98 +49,84 @@
     
                     <!-- Navigation Menu -->
                     <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+
                         @can('tenant-dashboard-access')
-                        <!-- Dashboard -->
-                        <a href="/dashboard"
-                           class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('home') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
-                            <svg class="w-5 h-5 mr-3 transition-colors {{ request()->routeIs('home') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                            <a href="/dashboard"
+                               class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('home') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                                <svg class="w-5 h-5 mr-3 {{ request()->routeIs('home') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                                </svg>
+                                <span class="font-medium">Dashboard</span>
+                            </a>
+                    
+                            <a href="/dashboard/order"
+                               class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('dashboard.orders*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                                <svg class="w-5 h-5 mr-3 {{ request()->routeIs('dashboard.orders*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                                </svg>
+                                <span class="font-medium">Pesanan Masuk</span>
+                                <livewire:order.badge-count />
+                            </a>
+                    
+                            <a href="/dashboard/menu"
+                               class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('tenant.menu*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                                <svg class="w-5 h-5 mr-3 {{ request()->routeIs('tenant.menu*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                                </svg>
+                                <span class="font-medium">Kelola Menu</span>
+                            </a>
+                    
+                            <a href="/dashboard/report"
+                               class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('dashboard.reports*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                                <svg class="w-5 h-5 mr-3 {{ request()->routeIs('dashboard.reports*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                                <span class="font-medium">Riwayat Pesanan</span>
+                            </a>
+                    
+                            <a href="/dashboard/tenant/profile"
+                               class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('dashboard.tenant.profile') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                                <flux:icon.building-storefront class="w-5 h-5 mr-3 {{ request()->routeIs('dashboard.tenant.profile') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" />
+                                <span class="font-medium">Profil Tenant</span>
+                            </a>
+                        @endcan  
+                        @can('tenant-payout-access')
+                        <a href="{{ route('tenant.payout') }}"
+                           class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('tenant.payout*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                            <svg class="w-5 h-5 mr-3 {{ request()->routeIs('tenant.payout*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-2.21 0-4 1.343-4 3s1.79 3 4 3 4 1.343 4 3-1.79 3-4 3m0-12V5m0 14v-2M7 11H5m14 0h-2M8.5 7.5L7 6m9 1.5L17 6"/>
                             </svg>
-                            <span class="font-medium">Dashboard</span>
+                            <span class="font-medium">Payout</span>
                         </a>
-    
-                        <!-- Pesanan Masuk -->
-                        <a href="/dashboard/order" 
-                           class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('dashboard.orders*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
-                            <svg class="w-5 h-5 mr-3 {{ request()->routeIs('dashboard.orders*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                        <a href="/payout/payment" 
+                        class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('payout.payment') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                            <flux:icon.credit-card class="w-5 h-5 mr-3 {{ request()->routeIs('payout.payment') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"/>
+                            <span class="font-medium">Metode Pembayaran Payout</span>
+                        </a>  
+                        <a href="/payout/order" 
+                        class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('payout.order') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                            <svg class="w-5 h-5 mr-3 {{ request()->routeIs('payout.order') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
                             </svg>
                             <span class="font-medium">Pesanan Masuk</span>
-                            <livewire:order.badge-count />
-                        </a>
-
-                        <a href="/dashboard/menu"
-                           class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('tenant.menu*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
-                            <svg class="w-5 h-5 mr-3 {{ request()->routeIs('tenant.menu*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                            </svg>
-                            <span class="font-medium">Kelola Menu</span>
-                        </a>
-    
-                        <!-- Laporan -->
-                        <a href="/dashboard/report"
-                           class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('dashboard.reports*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
-                            <svg class="w-5 h-5 mr-3 {{ request()->routeIs('dashboard.reports*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                            </svg>
-                            <span class="font-medium">Riwayat Pesanan</span>
-                        </a>
-    
-                        <!-- Pengaturan Tenant -->
-                        <div x-data="{ open: {{ request()->routeIs('dashboard.tenant.*') ? 'true' : 'false' }} }" class="space-y-1">
-                            <!-- Trigger Dropdown Button -->
-                            <button @click="open = !open" 
-                                    class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('dashboard.tenant.*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
-                                <div class="flex items-center">
-                                    <svg class="w-5 h-5 mr-3 {{ request()->routeIs('dashboard.tenant.*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    </svg>
-                                    <span class="font-medium">Kelola Tenant</span>
-                                </div>
-                                <svg :class="{'rotate-180': open}" class="w-4 h-4 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </a> 
+                        <a href="/payout/report"
+                               class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('payout.report*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                                <svg class="w-5 h-5 mr-3 {{ request()->routeIs('payout.report*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                                 </svg>
-                            </button>
-                        
-                            <!-- Isi Dropdown Menu -->
-                            <div x-show="open" 
-                                 x-transition:enter="transition ease-out duration-100"
-                                 x-transition:enter-start="transform opacity-0 scale-95"
-                                 x-transition:enter-end="transform opacity-100 scale-100"
-                                 x-transition:leave="transition ease-in duration-75"
-                                 x-transition:leave-start="transform opacity-100 scale-100"
-                                 x-transition:leave-end="transform opacity-0 scale-95"
-                                 class="pl-8 space-y-1" 
-                                 style="display: none;">
-
-                                 <div class="items-center">
-                                    <a href="/dashboard/tenant/profile" 
-                                       class="inline-block w-full py-2 px-2 text-sm text-gray-600 rounded-lg transition-colors duration-150 {{ request()->routeIs('dashboard.tenant.profile') ? 'text-orange-500 font-semibold bg-orange-50' : 'hover:bg-gray-50 hover:text-gray-900' }}">             
-                                        <flux:icon.building-storefront class="inline-block size-5 align-middle {{ request()->routeIs('dashboard.tenant.profile') ? 'text-orange-500' : 'text-gray-400 group-hover:text-orange-500' }} mr-1.5"/>
-                                        
-                                        <span class="inline-block align-middle">Profil Tenant</span>
-                                    </a>
-                                </div>
-
-                                <div class="items-center">
-                                    <a href="/dashboard/tenant/payment" 
-                                       class="inline-block w-full py-2 px-2 text-sm text-gray-600 rounded-lg transition-colors duration-150 {{ request()->routeIs('dashboard.tenant.payment') ? 'text-orange-500 font-semibold bg-orange-50' : 'hover:bg-gray-50 hover:text-gray-900' }}">             
-                                        <flux:icon.credit-card class="inline-block size-5 align-middle {{ request()->routeIs('dashboard.tenant.payment') ? 'text-orange-500' : 'text-gray-400 group-hover:text-orange-500' }} mr-1.5"/>
-                                        
-                                        <span class="inline-block align-middle">Metode Pembayaran</span>
-                                    </a>
-                                </div>                              
-                            </div>
-                        </div>
-                        @else         
-                        <a href="#"
-                            class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('tenant.reservation') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
-                            <svg class="w-5 h-5 mr-3 transition-colors {{ request()->routeIs('tenant.reservation') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                            </svg>
-                            <span class="font-medium">Reservasi</span>
-                        </a>
+                                <span class="font-medium">Riwayat Pesanan</span>
+                            </a>
+                        @endcan
+              
+                        @can('reservation-access')
+                            <a href="{{ route('tenant.reservation') }}"
+                               class="flex items-center px-4 py-3 text-gray-700 rounded-xl transition-all duration-200 group {{ request()->routeIs('tenant.reservation*') ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg' : 'hover:bg-orange-50 hover:text-orange-600' }}">
+                                <svg class="w-5 h-5 mr-3 {{ request()->routeIs('tenant.reservation*') ? 'text-white' : 'text-gray-400 group-hover:text-orange-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                <span class="font-medium">Reservasi</span>
+                            </a>
                         @endcan
                     </nav>
                 </div>

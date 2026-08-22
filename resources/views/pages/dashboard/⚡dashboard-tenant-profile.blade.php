@@ -133,7 +133,7 @@ new class extends Component
     #[Computed]
     public function totalOrders()
     {
-        return Order::where('data_tenant->reservation_id', $this->reservation->id)->where('status', '!=', 'Dibatalkan')->count();
+        return Order::where('reservation_id', $this->reservation->id)->where('status', '!=', 'Dibatalkan')->count();
     }
     
     public function loadPickupSlots()
@@ -545,7 +545,7 @@ new class extends Component
         @if($activeTab === 'open')
         <div class="bg-white border border-gray-300 rounded-xl shadow-sm overflow-hidden">
             <div class="px-6 py-4 border-b bg-gradient-to-r from-orange-50 to-amber-50 flex justify-between items-center">
-                <h3 class="text-lg font-semibold text-gray-800">Waktu Buka</h3>
+                <h3 class="text-lg font-semibold text-gray-800">Waktu Pickup (Untuk Menu Pre Order Only)</h3>
                 <button wire:click="openAddSlot" 
                         class="px-3 py-1.5 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition flex items-center gap-1">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -683,7 +683,7 @@ new class extends Component
                     <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-auto">
                         <div class="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
                             <h3 class="text-lg font-semibold text-gray-800">
-                                {{ $editingSlotId ? 'Edit Slot Buka' : 'Tambah Slot Buka' }}
+                                {{ $editingSlotId ? 'Edit Slot Pickup' : 'Tambah Slot Pickup' }}
                             </h3>
                             <button wire:click="$set('showAddSlot', false)" class="text-gray-400 hover:text-gray-600">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

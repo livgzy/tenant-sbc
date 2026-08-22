@@ -58,46 +58,7 @@ new class extends Component
             ->groupBy('status')
             ->pluck('total', 'status');
     }
-
-    public function acceptOrder(int $orderId): void
-    {
-        $order = $this->findTenantOrder($orderId);
-
-        if (!$order || $order->status !== 'Pending') {
-            $this->dispatch('notify', type: 'error', message: 'Pesanan tidak ditemukan atau sudah diproses.');
-            return;
-        }
-
-        if ($order->payment_method === 'Non Tunai') {
-            if (!$order->paymentBatch) {
-                $this->dispatch('notify', type: 'error', message: 'Data pembayaran tidak ditemukan.');
-                return;
-            }
-
-            if ($order->paymentBatch->status !== 'Berhasil') {
-                $this->dispatch('notify', type: 'error', message: 'Pembayaran belum berhasil.');
-                return;
-            }
-
-            $order->update([
-                'status' => 'Diproses',
-                'payment_status' => 'Sudah Dibayar',
-            ]);
-        } else {
-            $order->update([
-                'status' => 'Diproses',
-            ]);
-        }
-
-        FonnteService::notifyCustomerStatus($order);
-
-        $this->dispatch(
-            'notify',
-            type: 'success',
-            message: "Pesanan {$order->order_number} diterima."
-        );
-    }
-
+    
     public function cancelOrder(int $orderId): void
     {
         $order = $this->findTenantOrder($orderId);
@@ -342,7 +303,7 @@ new class extends Component
 
                 <div class="mt-4 flex flex-wrap gap-2">
                     @if ($order->status === 'Pending')
-                        @if ($order->payment_method === 'Tunai' || ($order->payment_method === 'Non Tunai' && $order->paymentBatch?->status === 'Berhasil'))
+                        {{-- @if ($order->payment_method === 'Tunai' || ($order->payment_method === 'Non Tunai' && $order->paymentBatch?->status === 'Berhasil'))
                             <button
                                 wire:click="acceptOrder({{ $order->id }})"
                                 wire:confirm="Terima pesanan {{ $order->order_number }}?"
@@ -354,7 +315,7 @@ new class extends Component
                             <span class="rounded-lg bg-orange-50 px-3 py-1.5 text-sm text-orange-600">
                                 Menunggu pembayaran
                             </span>
-                        @endif
+                        @endif --}}
 
                         <button
                             wire:click="cancelOrder({{ $order->id }})"

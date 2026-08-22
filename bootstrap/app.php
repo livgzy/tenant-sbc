@@ -4,6 +4,10 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use App\Http\Middleware\EnsureReservationAccess;
+use App\Http\Middleware\EnsureTenantAccess;
+use App\Http\Middleware\EnsureTenantDashboardAccess;
+use App\Http\Middleware\EnsureTenantPayoutAccess;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,8 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'tenant-dashboard-access' => \App\Http\Middleware\EnsureTenantDashboardAccess::class,
-            'reservation-access'      => \App\Http\Middleware\EnsureReservationAccess::class,
+            'tenant.access' => EnsureTenantAccess::class
         ]);
         $middleware->trustProxies(
             at: '*',

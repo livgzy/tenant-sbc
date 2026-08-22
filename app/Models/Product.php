@@ -3,11 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
+    use SoftDeletes;
+    
     protected $fillable = [
         'tenant_id',
+        'reservation_id',
         'category_id',
         'name',
         'slug',
@@ -21,12 +25,16 @@ class Product extends Model
     protected $casts = [
         'is_available' => 'boolean',
         'price' => 'decimal:2',
-        'dayPreorder' => 'array',
     ];
 
     public function tenant()
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function reservation()
+    {
+        return $this->belongsTo(Reservation::class);
     }
 
     public function category()

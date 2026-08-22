@@ -48,7 +48,7 @@ class FonnteService
                 . "Mohon maaf, pesanan Anda *{$orderNumber}* di *{$storeName}* telah *Dibatalkan* oleh tenant.\n\n"
                 . "Jika Anda sudah melakukan pembayaran, silakan hubungi tenant terkait {$storePhone} untuk proses lebih lanjut.",
 
-            'Siap Diambil' => "Halo {$customerName}, 🎉\n\n"
+            'Selesai' => "Halo {$customerName}, 🎉\n\n"
                 . "Pesanan Anda *{$orderNumber}* di *{$storeName}* sudah *Siap Diambil*!\n\n"
                 . "Silakan ambil sesuai jadwal pickup: *{$pickupDay}, {$pickupTime} ({$pickupStart}-{$pickupEnd})*.\n\n"
                 . "Ditunggu kedatangannya ya!",

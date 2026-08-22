@@ -105,7 +105,7 @@ new class extends Component
             Storage::disk('public')->delete($menu->product_img);
         }
 
-        $menu->delete();
+        $menu->forceDelete();
 
         session()->flash('message', 'Menu berhasil dihapus.');
 

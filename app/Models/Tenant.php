@@ -26,23 +26,28 @@ class Tenant extends Model
         return $this->hasMany(Product::class);
     }
 
-    public function orders()
-    {
-        return $this->hasMany(Order::class);
-    }
+    // public function orders()
+    // {
+    //     return $this->hasMany(Order::class);
+    // }
 
     public function reservation()
     {
         return $this->belongsTo(Reservation::class);
     }
 
-    public function payment_method()
-    {
-        return $this->hasMany(PaymentMethod::class);
-    }
+    // public function payment_method()
+    // {
+    //     return $this->hasMany(PaymentMethod::class);
+    // }
 
     public function pick_slot()
     {
         return $this->hasMany(PickupSlot::class);
+    }
+
+    public function histories()
+    {
+        return $this->hasMany(TenantHistory::class, 'tenant_code', 'tenant_code');
     }
 }

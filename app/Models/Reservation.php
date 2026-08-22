@@ -37,4 +37,41 @@ class Reservation extends Model
     {
         return $this->hasOne(Tenant::class, 'reservation_id');
     }
+
+    public function products()
+    {
+        return $this->hasMany(Product::class);
+    }
+ 
+    public function paymentMethod()
+    {
+        return $this->hasOne(PaymentMethod::class, 'reservation_id');
+    }
+
+    public function tenantHistory()
+    {
+        return $this->hasOne(TenantHistory::class, 'reservation_id');
+    }
+
+    public function tenantWallet()
+    {
+        return $this->hasOne(TenantWallet::class, 'reservation_id');
+    }
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+    
+    public function getOutstandingBalanceAttribute(): float
+    {
+        return $this->tenantWallet
+            ? (float) $this->tenantWallet->total_earned - (float) $this->tenantWallet->total_paid_out
+            : 0.0;
+    }
+ 
+    public function getIsPayoutSettledAttribute(): bool
+    {
+        return $this->tenantWallet ? (bool) $this->tenantWallet->is_settled : true;
+    }
 }

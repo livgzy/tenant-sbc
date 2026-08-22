@@ -3,9 +3,7 @@
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
-use App\Models\Tenant;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -25,17 +23,21 @@ new class extends Component
         $this->customFrom = now()->subDays(6)->format('Y-m-d');
         $this->customTo = now()->format('Y-m-d');
 
-        if (!$this->tenant) {
+        if (!$this->reservation) {
             return redirect()->route('home');
         }
     }
 
     #[Computed]
-    public function tenant()
+    public function reservation()
     {
-        $reservation = Auth::guard('tenant')->user()->reservation()->latest()->first();
+        return Auth::guard('tenant')->user()->reservation()->latest()->first();
+    }
 
-        return $reservation?->tenant;
+    #[Computed]
+    public function storeName(): ?string
+    {
+        return $this->reservation?->tenantHistory?->store_name;
     }
 
     private function dateRange(): array
@@ -57,7 +59,7 @@ new class extends Component
         [$from, $to] = $this->dateRange();
 
         return Order::query()
-            ->where('reservation_id', $this->tenant->reservation_id)
+            ->where('reservation_id', $this->reservation->id)
             ->whereBetween('created_at', [$from, $to]);
     }
 
@@ -123,15 +125,20 @@ new class extends Component
     #[Computed]
     public function topProducts()
     {
-        $products = Product::query()
-            ->where('tenant_id', $this->tenant->id)
+        // Scoped by reservation_id (bukan tenant_id): tenant_id adalah slot fisik yang
+        // bisa dipakai ulang tenant lain di periode berikutnya, sedangkan reservation_id
+        // adalah snapshot periode sewa tenant ini secara spesifik.
+        // withTrashed() karena produk tenant yang sudah berakhir masa sewanya kemungkinan
+        // sudah di-soft-delete saat slot dibersihkan untuk tenant berikutnya.
+        $products = Product::withTrashed()
+            ->where('reservation_id', $this->reservation->id)
             ->get();
 
         $items = OrderItem::query()
             ->whereHas('order', function ($q) {
                 $q->where(
                     'reservation_id',
-                    $this->tenant->reservation_id
+                    $this->reservation->id
                 )->where('status', '!=', 'Dibatalkan');
             })
             ->get()
@@ -213,7 +220,7 @@ new class extends Component
         $order = Order::with(['items', 'user'])
             ->where(
                 'reservation_id',
-                $this->tenant->reservation_id
+                $this->reservation->id
             )
             ->find($id);
 
@@ -229,20 +236,13 @@ new class extends Component
 
         $this->selectedOrder = [
             'order_number' => $order->order_number,
+            'order_type' => $order->order_type,
             'created_at' => $order->created_at->format('d/m/Y H:i'),
             'status' => $order->status,
             'customer_name' => $order->user->name ?? '-',
             'customer_phone' => $order->user->phone ?? null,
             'payment_method' => $order->payment_method,
             'payment_status' => $order->payment_status,
-            'payment_type' => $this->formatPaymentType(
-                data_get($order->data_payment_method, 'type')
-            ),
-            'payment_name' => data_get(
-                $order->data_payment_method,
-                'name_payment'
-            ),
-            'payment_proof_url' => $order->payment_proof_img,
             'total_amount' => $order->total_amount,
             'pickup_day' => data_get(
                 $order->data_pickup_slot,
@@ -295,16 +295,6 @@ new class extends Component
         $this->showOrderDetail = true;
     }
 
-    private function formatPaymentType(?string $type): ?string
-    {
-        return match ($type) {
-            'e_wallet' => 'E Wallet',
-            'bank_transfer' => 'Bank Transfer',
-            'qris' => 'QRIS',
-            default => $type ? Str::headline($type) : null,
-        };
-    }
-
     public function closeOrderDetail(): void
     {
         $this->showOrderDetail = false;
@@ -316,6 +306,7 @@ new class extends Component
         $this->dispatch(
             'open-print-report',
             url: route('report.print', [
+                'reservation_id' => $this->reservation->id,
                 'from' => $this->customFrom,
                 'to' => $this->customTo,
             ])
@@ -360,7 +351,7 @@ new class extends Component
         <div>
             <h1 class="text-2xl font-bold text-gray-800">Dashboard Laporan Pesanan</h1>
             <p class="text-gray-500 mt-1">
-                Ringkasan penjualan tenant {{ $this->tenant->store_name }}
+                Ringkasan penjualan tenant {{ $this->storeName ?? '-' }}
             </p>
         </div>
     </div>
@@ -654,9 +645,15 @@ new class extends Component
                                 </p>
                             </div>
 
-                            <span class="inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
-                                Pre Order
-                            </span>
+                            @if ($selectedOrder['order_type'] === 'pre_order')
+                                <span class="inline-flex items-center rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">
+                                    Pre Order
+                                </span>
+                            @else
+                                <span class="inline-flex items-center rounded bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 ring-1 ring-inset ring-gray-500/20">
+                                    Reguler
+                                </span>
+                            @endif
                         </div>
 
                         @if ($selectedOrder['customer_name'])
@@ -685,7 +682,6 @@ new class extends Component
                                     'font-medium inline-flex items-center rounded px-1.5 py-0.5 text-xs ring-1 ring-inset mt-0.5',
                                     'bg-yellow-50 text-yellow-700 ring-yellow-600/20' => $selectedOrder['status'] === 'Pending',
                                     'bg-blue-50 text-blue-700 ring-blue-600/20' => $selectedOrder['status'] === 'Diproses',
-                                    'bg-purple-50 text-purple-700 ring-purple-600/20' => $selectedOrder['status'] === 'Siap Diambil',
                                     'bg-green-50 text-green-700 ring-green-600/20' => $selectedOrder['status'] === 'Selesai',
                                     'bg-red-50 text-red-700 ring-red-600/20' => $selectedOrder['status'] === 'Dibatalkan',
                                 ])>
@@ -717,114 +713,7 @@ new class extends Component
                                     {{ $selectedOrder['payment_method'] }}
                                 </p>
                             </div>
-
-                            @if ($selectedOrder['payment_type'] || $selectedOrder['payment_name'])
-                                <div>
-                                    <p class="text-xs text-gray-500">
-                                        Detail Pembayaran
-                                    </p>
-
-                                    <p class="font-medium text-gray-800">
-                                        {{ $selectedOrder['payment_type'] }}
-
-                                        @if ($selectedOrder['payment_name'])
-                                            &middot; {{ $selectedOrder['payment_name'] }}
-                                        @endif
-                                    </p>
-                                </div>
-                            @endif
                         </div>
-
-                        @if ($selectedOrder['payment_proof_url'])
-                            <div x-data="{ showImagePreview: false }">
-                                <p class="text-xs text-gray-500 mb-1">
-                                    Bukti Pembayaran
-                                </p>
-
-                                <button
-                                    type="button"
-                                    @click="showImagePreview = true"
-                                    class="group relative inline-block"
-                                >
-                                    <img
-                                        src="{{ Storage::disk('public')->url($selectedOrder['payment_proof_url']) }}"
-                                        alt="Bukti Pembayaran"
-                                        class="w-full max-h-56 object-contain rounded-lg border border-gray-200 transition group-hover:brightness-90"
-                                    >
-
-                                    <span class="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 rounded-lg transition">
-                                        <svg
-                                            class="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
-                                        >
-                                            <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.35 4.35a7.5 7.5 0 0012.3 12.3zM10.5 7.5v6m-3-3h6"
-                                            ></path>
-                                        </svg>
-                                    </span>
-                                </button>
-
-                                <div
-                                    x-show="showImagePreview"
-                                    x-cloak
-                                    @keydown.escape.window="showImagePreview = false"
-                                    x-transition:enter="transition ease-out duration-200"
-                                    x-transition:enter-start="opacity-0"
-                                    x-transition:enter-end="opacity-100"
-                                    x-transition:leave="transition ease-in duration-150"
-                                    x-transition:leave-start="opacity-100"
-                                    x-transition:leave-end="opacity-0"
-                                    class="fixed inset-0 z-[60] flex items-center justify-center p-4"
-                                >
-                                    <div
-                                        class="absolute inset-0 bg-black/80 backdrop-blur-sm"
-                                        @click="showImagePreview = false"
-                                    ></div>
-
-                                    <div
-                                        x-show="showImagePreview"
-                                        x-transition:enter="transition ease-out duration-200"
-                                        x-transition:enter-start="opacity-0 scale-95"
-                                        x-transition:enter-end="opacity-100 scale-100"
-                                        x-transition:leave="transition ease-in duration-150"
-                                        x-transition:leave-start="opacity-100 scale-100"
-                                        x-transition:leave-end="opacity-0 scale-95"
-                                        class="relative max-w-3xl w-full"
-                                    >
-                                        <button
-                                            type="button"
-                                            @click="showImagePreview = false"
-                                            class="absolute -top-10 right-0 text-white/80 hover:text-white transition"
-                                        >
-                                            <svg
-                                                class="w-7 h-7"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <path
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                    stroke-width="2"
-                                                    d="M6 18L18 6M6 6l12 12"
-                                                ></path>
-                                            </svg>
-                                        </button>
-
-                                        <img
-                                            src="{{ Storage::disk('public')->url($selectedOrder['payment_proof_url']) }}"
-                                            alt="Bukti Pembayaran"
-                                            class="w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
-                                        >
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
 
                         @if ($selectedOrder['pickup_day'])
                             <div>

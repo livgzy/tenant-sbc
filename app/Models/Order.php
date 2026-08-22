@@ -12,26 +12,33 @@ class Order extends Model
     protected $fillable = [
         'order_number',
         'data_tenant',
+        'reservation_id',
         'user_id',
+        'order_type',
         'status',
         'total_amount',
         'payment_status',
         'payment_method',
-        'payment_method_id',
-        'data_payment_method',
         'pickup_time',
         'pickup_slot_id',
         'data_pickup_slot',
-        'payment_proof_img',
+        'payment_batch_id',
     ];
  
     protected $casts = [
-        'data_tenant' => 'array',
-        'data_payment_method' => 'array',
+        'data_tenant'      => 'array',
         'data_pickup_slot' => 'array',
-        'total_amount' => 'decimal:2',
+        'total_amount'     => 'decimal:2',
+        'pickup_time'      => 'datetime:H:i',
+        'paid_at'          => 'datetime',
+        'expired_at'       => 'datetime',
     ];
- 
+
+    public function reservation()
+    {
+        return $this->belongsTo(Reservation::class);
+    }
+
     public function items()
     {
         return $this->hasMany(OrderItem::class);
@@ -41,10 +48,10 @@ class Order extends Model
     {
         return $this->belongsTo(User::class);
     }
- 
-    public function paymentMethod()
+
+    public function paymentBatch()
     {
-        return $this->belongsTo(PaymentMethod::class);
+        return $this->belongsTo(PaymentBatch::class);
     }
  
     public function pickupSlot()
